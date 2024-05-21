@@ -1,0 +1,561 @@
+```
+└── 📁src
+    └── App.js
+        import { useEffect, useState, useCallback } from "react";
+        import Container from "@mui/material/Container";
+        import Game from "./Game";
+        import InitGame from "./InitGame";
+        import CustomDialog from "./components/CustomDialog";
+        import socket from "./socket";
+        import { TextField } from "@mui/material";
+
+        export default function App() {
+            const [username, setUsername] = useState("");
+            const [usernameSubmitted, setUsernameSubmitted] = useState(false);
+
+            const [room, setRoom] = useState("");
+            const [orientation, setOrientation] = useState("");
+            const [players, setPlayers] = useState([]);
+
+            // resets the states responsible for initializing a game
+            const cleanup = useCallback(() => {
+                setRoom("");
+                setOrientation("");
+                setPlayers("");
+            }, []);
+
+            useEffect(() => {
+                socket.on("opponentJoined", (roomData) => {
+                    console.log("roomData", roomData)
+                    setPlayers(roomData.players);
+                });
+            }, []);
+
+            return (
+                <Container>
+                    <CustomDialog
+                        open={!usernameSubmitted}
+                        handleClose={() => setUsernameSubmitted(true)}
+                        title="Pick a username"
+                        contentText="Please select a username"
+                        handleContinue={() => {
+                            if (!username) return;
+                            socket.emit("username", username);
+                            setUsernameSubmitted(true);
+                        }}
+                    >
+                        <TextField
+                            autoFocus
+                            margin="dense"
+                            id="username"
+                            label="Username"
+                            name="username"
+                            value={username}
+                            required
+                            onChange={(e) => setUsername(e.target.value)}
+                            type="text"
+                            fullWidth
+                            variant="standard"
+                        />
+                    </CustomDialog>
+                    {room ? (
+                        <Game
+                            room={room}
+                            orientation={orientation}
+                            username={username}
+                            players={players}
+                            // the cleanup function will be used by Game to reset the state when a game is over
+                            cleanup={cleanup}
+                        />
+                    ) : (
+                        <InitGame
+                            setRoom={setRoom}
+                            setOrientation={setOrientation}
+                            setPlayers={setPlayers}
+                        />
+                    )}
+                </Container>
+            );
+        }
+    └── 📁components
+        └── CustomDialog.js
+            import Button from "@mui/material/Button";
+            import Dialog from "@mui/material/Dialog";
+            import DialogActions from "@mui/material/DialogActions";
+            import DialogContent from "@mui/material/DialogContent";
+            import DialogContentText from "@mui/material/DialogContentText";
+            import DialogTitle from "@mui/material/DialogTitle";
+
+            export default function CustomDialog({ open, children, title, contentText, handleContinue }) {
+                return (
+                    <Dialog open={open}> {/*dialog container*/}
+                    <DialogTitle>{title}</DialogTitle>
+                    <DialogContent> {/* Main body of modal/dialog */}
+                        <DialogContentText> {/* main text */}
+                        {contentText}
+                        </DialogContentText>
+                        {children} {/* Other content */}
+                    </DialogContent>
+                    <DialogActions> {/* Dialog action buttons */}
+                        {/* Force users to make input without option to cancel */}
+                        {/* <Button onClick={handleClose}>Cancel</Button> */}
+                        <Button onClick={handleContinue}>Continue</Button>
+                    </DialogActions>
+                    </Dialog>
+                );
+            }
+        └── VideoPlayer.js
+            import React, { useRef, useEffect } from 'react';
+            import Peer from 'simple-peer';
+
+            const VideoPlayer = ({ peer }) => {
+                const ref = useRef();
+
+                useEffect(() => {
+                    peer.on('stream', stream => {
+                        ref.current.srcObject = stream;
+                    });
+                }, [peer]);
+
+                return (
+                    <video playsInline autoPlay ref={ref} />
+                );
+            };
+
+            export default VideoPlayer;
+    └── Game.js
+        import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+        import { Chessboard } from "react-chessboard";
+        import { Chess } from "chess.js";
+        import Peer from 'simple-peer';
+        import CustomDialog from "./components/CustomDialog";
+        import VideoPlayer from "./components/VideoPlayer";
+        import socket from "./socket";
+        import { Card, CardContent, Typography, Stack, Box, List, ListItem, ListItemText, ListSubheader } from "@mui/material";
+
+        function Game({ players, room, orientation, cleanup }) {
+            const chess = useMemo(() => new Chess(), []); // <- 1
+            const [fen, setFen] = useState(chess.fen()); // <- 2
+            const [over, setOver] = useState("");
+            const [peers, setPeers] = useState([]);
+            const userVideo = useRef();
+            const peersRef = useRef([]);
+
+            const makeAMove = useCallback((move) => {
+                try {
+                    const result = chess.move(move); // update Chess instance
+                    setFen(chess.fen()); // update fen state to trigger a re-render
+
+                    console.log("over, checkmate", chess.isGameOver(), chess.isCheckmate());
+
+                    if (chess.isGameOver()) { // check if move led to "game over"
+                        if (chess.isCheckmate()) { // if reason for game over is a checkmate
+                            // Set message to checkmate. 
+                            setOver(
+                                `Checkmate! ${chess.turn() === "w" ? "black" : "white"} wins!`
+                            );
+                            // The winner is determined by checking which side made the last move
+                        } else if (chess.isDraw()) { // if it is a draw
+                            setOver("Draw"); // set message to "Draw"
+                        } else {
+                            setOver("Game over");
+                        }
+                    }
+
+                    return result;
+                } catch (e) {
+                    return null;
+                } // null if the move was illegal, the move object if the move was legal
+            }, [chess]);
+
+            useEffect(() => {
+                navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+                    userVideo.current.srcObject = stream;
+
+                    socket.on('userJoined', payload => {
+                        const peer = addPeer(payload.signal, payload.callerID, stream);
+                        peersRef.current.push({
+                            peerID: payload.callerID,
+                            peer,
+                        });
+
+                        setPeers(users => [...users, peer]);
+                    });
+
+                    socket.on('receivingReturnedSignal', payload => {
+                        const item = peersRef.current.find(p => p.peerID === payload.id);
+                        item.peer.signal(payload.signal);
+                    });
+                });
+
+                return () => {
+                    peersRef.current.forEach(p => {
+                        p.peer.destroy();
+                    });
+                };
+            }, []);
+
+            function createPeer(userToSignal, callerID, stream) {
+                const peer = new Peer({
+                    initiator: true,
+                    trickle: false,
+                    stream,
+                });
+
+                peer.on('signal', signal => {
+                    socket.emit('sendingSignal', { userToSignal, callerID, signal });
+                });
+
+                return peer;
+            }
+
+            function addPeer(incomingSignal, callerID, stream) {
+                const peer = new Peer({
+                    initiator: false,
+                    trickle: false,
+                    stream,
+                });
+
+                peer.on('signal', signal => {
+                    socket.emit('returningSignal', { signal, callerID });
+                });
+
+                peer.signal(incomingSignal);
+
+                return peer;
+            }
+
+            // onDrop function
+            function onDrop(sourceSquare, targetSquare) {
+                // orientation is either 'white' or 'black'. game.turn() returns 'w' or 'b'
+                if (chess.turn() !== orientation[0]) return false; // <- 1 prohibit player from moving piece of other player
+
+                if (players.length < 2) return false; // <- 2 disallow a move if the opponent has not joined
+
+                const moveData = {
+                    from: sourceSquare,
+                    to: targetSquare,
+                    color: chess.turn(),
+                    promotion: "q", // promote to queen where possible
+                };
+
+                const move = makeAMove(moveData);
+
+                // illegal move
+                if (move === null) return false;
+
+                socket.emit("move", { // <- 3 emit a move event.
+                    move,
+                    room,
+                }); // this event will be transmitted to the opponent via the server
+
+                return true;
+            }
+
+            useEffect(() => {
+                socket.on("move", (move) => {
+                    makeAMove(move); //
+                });
+            }, [makeAMove]);
+
+            useEffect(() => {
+                socket.on('playerDisconnected', (player) => {
+                    setOver(`${player.username} has disconnected`); // set game over
+                });
+            }, []);
+
+            useEffect(() => {
+                socket.on('closeRoom', ({ roomId }) => {
+                    if (roomId === room) {
+                        cleanup();
+                    }
+                });
+            }, [room, cleanup]);
+
+            return (
+                <Stack>
+                    <Card>
+                        <CardContent>
+                            <Typography variant="h5">Room ID: {room}</Typography>
+                        </CardContent>
+                    </Card>
+                    <Stack flexDirection="row" sx={{ pt: 2 }}>
+                        <div className="board" style={{
+                            maxWidth: 600,
+                            maxHeight: 600,
+                            flexGrow: 1,
+                        }}>
+                            <Chessboard
+                                position={fen}
+                                onPieceDrop={onDrop}
+                                boardOrientation={orientation}
+                            />
+                        </div>
+                        {players.length > 0 && (
+                            <Box>
+                                <List>
+                                    <ListSubheader>Players</ListSubheader>
+                                    {players.map((p) => (
+                                        <ListItem key={p.id}>
+                                            <ListItemText primary={p.username} />
+                                        </ListItem>
+                                    ))}
+                                </List>
+                            </Box>
+                        )}
+                        <video ref={userVideo} autoPlay playsInline />
+                        {peers.map((peer, index) => (
+                            <VideoPlayer key={index} peer={peer} />
+                        ))}
+                    </Stack>
+                    <CustomDialog // Game Over CustomDialog
+                        open={Boolean(over)}
+                        title={over}
+                        contentText={over}
+                        handleContinue={() => {
+                            socket.emit("closeRoom", { roomId: room });
+                            cleanup();
+                        }}
+                    />
+                </Stack>
+            );
+            
+        }
+
+        export default Game;
+    └── index.js
+        import React from "react";
+        import ReactDOM from "react-dom/client";
+        import App from "./App";
+
+        const root = ReactDOM.createRoot(document.getElementById("root"));
+        root.render(<App />);
+    └── InitGame.js
+        import { Button, Stack, TextField } from "@mui/material";
+        import { useState } from "react";
+        import CustomDialog from "./components/CustomDialog";
+        import socket from './socket';
+
+        export default function InitGame({ setRoom, setOrientation, setPlayers }) {
+            const [roomDialogOpen, setRoomDialogOpen] = useState(false);
+            const [roomInput, setRoomInput] = useState(''); // input state
+            const [roomError, setRoomError] = useState('');
+
+            return (
+                <Stack
+                    justifyContent="center"
+                    alignItems="center"
+                    sx={{ py: 1, height: "100vh" }}
+                >
+                    <CustomDialog
+                        open={roomDialogOpen}
+                        handleClose={() => setRoomDialogOpen(false)}
+                        title="Select Room to Join"
+                        contentText="Enter a valid room ID to join the room"
+                        handleContinue={() => {
+                            // join a room
+                            if (!roomInput) return; // if given room input is valid, do nothing.
+                            socket.emit("joinRoom", { roomId: roomInput }, (r) => {
+                                // r is the response from the server
+                                if (r.error) return setRoomError(r.message); // if an error is returned in the response set roomError to the error message and exit
+                                console.log("response:", r);
+                                setRoom(r?.roomId); // set room to the room ID
+                                setPlayers(r?.players); // set players array to the array of players in the room
+                                setOrientation("black"); // set orientation as black
+                                setRoomDialogOpen(false); // close dialog
+                            });
+                        }}
+                    >
+                        <TextField
+                            autoFocus
+                            margin="dense"
+                            id="room"
+                            label="Room ID"
+                            name="room"
+                            value={roomInput}
+                            required
+                            onChange={(e) => setRoomInput(e.target.value)}
+                            type="text"
+                            fullWidth
+                            variant="standard"
+                            error={Boolean(roomError)}
+                            helperText={!roomError ? 'Enter a room ID' : `Invalid room ID: ${roomError}` }
+                        />
+                    </CustomDialog>
+                    {/* Button for starting a game */}
+                    <Button
+                        variant="contained"
+                        onClick={() => {
+                            socket.emit("createRoom", (r) => {
+                                console.log(r);
+                                setRoom(r);
+                                setOrientation("white");
+                            });
+                        }}
+                    >
+                        Start a game
+                    </Button>
+                    {/* Button for joining a game */}
+                    <Button
+                        onClick={() => {
+                            setRoomDialogOpen(true)
+                        }}
+                    >
+                        Join a game
+                    </Button>
+                </Stack>
+            );
+        }
+
+    └── socket.js
+        import { io } from "socket.io-client"; // import connection function
+
+        const socket = io('localhost:8080'); // initialize websocket connection
+
+        export default socket;
+```
+
+
+server
+    server.js
+    const express = require('express');
+    const {
+        Server
+    } = require("socket.io");
+    const {
+        v4: uuidV4
+    } = require('uuid');
+    const http = require('http');
+
+    const app = express(); // initialize express
+
+    const server = http.createServer(app);
+
+
+    // set port to value received from environment variable or 8080 if null
+    const port = process.env.PORT || 8080
+
+    // upgrade http server to websocket server
+    const io = new Server(server, {
+        cors: '*', // allow connection from any origin
+    });
+
+    const rooms = new Map();
+
+    // io.connection
+    io.on('connection', (socket) => {
+        // socket refers to the client socket that just got connected.
+        // each socket is assigned an id
+        console.log(socket.id, 'connected');
+        // listen to username event
+    
+        socket.on('username', (username) => {
+            console.log('username:', username);
+            socket.data.username = username;
+        });
+
+        // createRoom
+        socket.on('createRoom', async (callback) => { // callback here refers to the callback function from the client passed as data
+            const roomId = uuidV4(); // <- 1 create a new uuid
+            await socket.join(roomId); // <- 2 make creating user join the room
+        
+            // set roomId as a key and roomData including players as value in the map
+            rooms.set(roomId, { // <- 3
+                roomId,
+                players: [{ id: socket.id, username: socket.data?.username }]
+            });
+            // returns Map(1){'2b5b51a9-707b-42d6-9da8-dc19f863c0d0' => [{id: 'socketid', username: 'username1'}]}
+
+            callback(roomId); // <- 4 respond with roomId to client by calling the callback function from the client
+        });
+
+        socket.on('joinRoom', async (args, callback) => {
+            // check if room exists and has a player waiting
+            const room = rooms.get(args.roomId);
+            let error, message;
+        
+            if (!room) { // if room does not exist
+                error = true;
+                message = 'room does not exist';
+            } else if (room.length <= 0) { // if room is empty set appropriate message
+                error = true;
+                message = 'room is empty';
+            } else if (room.length >= 2) { // if room is full
+                error = true;
+                message = 'room is full'; // set message to 'room is full'
+            }
+        
+            if (error) {
+                // if there's an error, check if the client passed a callback,
+                // call the callback (if it exists) with an error object and exit or 
+                // just exit if the callback is not given
+        
+                if (callback) { // if user passed a callback, call it with an error payload
+                    callback({
+                        error,
+                        message
+                    });
+                }
+        
+                return; // exit
+            }
+        
+            await socket.join(args.roomId); // make the joining client join the room
+        
+            // add the joining user's data to the list of players in the room
+            const roomUpdate = {
+                ...room,
+                players: [
+                    ...room.players,
+                    { id: socket.id, username: socket.data?.username },
+                ],
+            };
+        
+            rooms.set(args.roomId, roomUpdate);
+        
+            callback(roomUpdate); // respond to the client with the room details.
+        
+            // emit an 'opponentJoined' event to the room to tell the other player that an opponent has joined
+            socket.to(args.roomId).emit('opponentJoined', roomUpdate);
+        });
+
+        socket.on('move', (data) => {
+            // emit to all sockets in the room except the emitting socket.
+            socket.to(data.room).emit('move', data.move);
+        });
+
+        socket.on("disconnect", () => {
+            const gameRooms = Array.from(rooms.values()); // <- 1
+        
+            gameRooms.forEach((room) => { // <- 2
+                const userInRoom = room.players.find((player) => player.id === socket.id); // <- 3
+        
+                if (userInRoom) {
+                    if (room.players.length < 2) {
+                        // if there's only 1 player in the room, close it and exit.
+                        rooms.delete(room.roomId);
+                        return;
+                    }
+        
+                    socket.to(room.roomId).emit("playerDisconnected", userInRoom); // <- 4
+                }
+            });
+        });    
+
+        socket.on("closeRoom", async (data) => {
+            socket.to(data.roomId).emit("closeRoom", data); // <- 1 inform others in the room that the room is closing
+        
+            const clientSockets = await io.in(data.roomId).fetchSockets(); // <- 2 get all sockets in a room
+        
+            // loop over each socket client
+            clientSockets.forEach((s) => {
+                s.leave(data.roomId); // <- 3 and make them leave the room on socket.io
+            });
+        
+            rooms.delete(data.roomId); // <- 4 delete room from rooms map
+        });    
+    });
+
+    server.listen(port, () => {
+        console.log(`listening on *:${port}`);
+    });
