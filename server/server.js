@@ -1,3 +1,4 @@
+const mysql = require('mysql');
 const express = require('express');
 const {
 	Server
@@ -13,7 +14,7 @@ const server = http.createServer(app);
 
 
 // set port to value received from environment variable or 8080 if null
-const port = process.env.PORT || 8080
+const port = process.env.PORT || 8081
 
 // upgrade http server to websocket server
 const io = new Server(server, {
