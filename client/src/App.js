@@ -5,8 +5,10 @@ import InitGame from "./InitGame";
 import CustomDialog from "./components/CustomDialog";
 import socket from "./socket";
 import { TextField } from "@mui/material";
+import Login from "./components/Login";
 
 export default function App() {
+    const [loggedIn, setLoggedIn] = useState(false);
     const [username, setUsername] = useState("");
     const [usernameSubmitted, setUsernameSubmitted] = useState(false);
 
@@ -28,9 +30,18 @@ export default function App() {
         });
     }, []);
 
+    useEffect(() => {
+        const name = localStorage.getItem("setName")
+        if(name){
+            setLoggedIn(name)
+        }
+    }, []);
+
     return (
         <Container>
-            <CustomDialog
+            {
+                loggedIn?
+                <CustomDialog
                 open={!usernameSubmitted}
                 handleClose={() => setUsernameSubmitted(true)}
                 title="Pick a username"
@@ -39,8 +50,7 @@ export default function App() {
                     if (!username) return;
                     socket.emit("username", username);
                     setUsernameSubmitted(true);
-                }}
-            >
+                }}>
                 <TextField
                     autoFocus
                     margin="dense"
@@ -54,23 +64,27 @@ export default function App() {
                     fullWidth
                     variant="standard"
                 />
-            </CustomDialog>
-            {room ? (
-                <Game
-                    room={room}
-                    orientation={orientation}
-                    username={username}
-                    players={players}
-                    // the cleanup function will be used by Game to reset the state when a game is over
-                    cleanup={cleanup}
-                />
-            ) : (
-                <InitGame
-                    setRoom={setRoom}
-                    setOrientation={setOrientation}
-                    setPlayers={setPlayers}
-                />
-            )}
+                </CustomDialog>
+                :<Login />
+            }
+                {(loggedIn) && (room ? (
+                    <Game
+                        room={room}
+                        orientation={orientation}
+                        username={username}
+                        players={players}
+                        // the cleanup function will be used by Game to reset the state when a game is over
+                        cleanup={cleanup}
+                    />
+                ) : (
+                    <InitGame
+                        setRoom={setRoom}
+                        setOrientation={setOrientation}
+                        setPlayers={setPlayers}
+                    />
+                
+                ))}
+            
         </Container>
     );
 }
