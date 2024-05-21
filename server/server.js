@@ -13,11 +13,11 @@ const http = require('http');
 const app = express();
 const server = http.createServer(app);
 
-// Set port to value received from environment variable or 8080 if null
-const port = process.env.PORT || 8080;
 
 // Added: Middleware to parse JSON request bodies
 app.use(bodyParser.json());
+// set port to value received from environment variable or 8080 if null
+const port = process.env.PORT || 8081
 
 // Added: CORS configuration
 app.use(cors({
