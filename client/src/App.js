@@ -1,90 +1,89 @@
 import { useEffect, useState, useCallback } from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Container from "@mui/material/Container";
 import Game from "./Game";
 import InitGame from "./InitGame";
 import CustomDialog from "./components/CustomDialog";
 import socket from "./socket";
 import { TextField } from "@mui/material";
+import { Navigate } from "react-router-dom";
 import Login from "./components/Login";
+import Register from "./components/Register";
 
 export default function App() {
-    const [loggedIn, setLoggedIn] = useState(false);
-    const [username, setUsername] = useState("");
-    const [usernameSubmitted, setUsernameSubmitted] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [username, setUsername] = useState("");
+  const [usernameSubmitted, setUsernameSubmitted] = useState(false);
 
-    const [room, setRoom] = useState("");
-    const [orientation, setOrientation] = useState("");
-    const [players, setPlayers] = useState([]);
+  const [room, setRoom] = useState("");
+  const [orientation, setOrientation] = useState("");
+  const [players, setPlayers] = useState([]);
 
-    // resets the states responsible for initializing a game
-    const cleanup = useCallback(() => {
-        setRoom("");
-        setOrientation("");
-        setPlayers("");
-    }, []);
+  // resets the states responsible for initializing a game
+  const cleanup = useCallback(() => {
+    setRoom("");
+    setOrientation("");
+    setPlayers("");
+  }, []);
 
-    useEffect(() => {
-        socket.on("opponentJoined", (roomData) => {
-            console.log("roomData", roomData)
-            setPlayers(roomData.players);
-        });
-    }, []);
+  useEffect(() => {
+    socket.on("opponentJoined", (roomData) => {
+      console.log("roomData", roomData);
+      setPlayers(roomData.players);
+    });
+  }, []);
 
-    useEffect(() => {
-        const name = localStorage.getItem("setName")
-        if(name){
-            setLoggedIn(name)
-        }
-    }, []);
+  useEffect(() => {
+    const name = localStorage.getItem("setName");
+    if (name) {
+      setLoggedIn(name);
+    }
+  }, []);
 
-    return (
-        <Container>
-            {
-                loggedIn?
-                <CustomDialog
-                open={!usernameSubmitted}
-                handleClose={() => setUsernameSubmitted(true)}
-                title="Pick a username"
-                contentText="Please select a username"
-                handleContinue={() => {
-                    if (!username) return;
-                    socket.emit("username", username);
-                    setUsernameSubmitted(true);
-                }}>
-                <TextField
-                    autoFocus
-                    margin="dense"
-                    id="username"
-                    label="Username"
-                    name="username"
-                    value={username}
-                    required
-                    onChange={(e) => setUsername(e.target.value)}
-                    type="text"
-                    fullWidth
-                    variant="standard"
+  return (
+    <Router>
+      <Container>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              !loggedIn ? (
+                <Login setLoggedIn={setLoggedIn} />
+              ) : (
+                <InitGame
+                  setRoom={setRoom}
+                  setOrientation={setOrientation}
+                  setPlayers={setPlayers}
                 />
-                </CustomDialog>
-                :<Login />
+              )
             }
-                {(loggedIn) && (room ? (
-                    <Game
-                        room={room}
-                        orientation={orientation}
-                        username={username}
-                        players={players}
-                        // the cleanup function will be used by Game to reset the state when a game is over
-                        cleanup={cleanup}
-                    />
-                ) : (
-                    <InitGame
-                        setRoom={setRoom}
-                        setOrientation={setOrientation}
-                        setPlayers={setPlayers}
-                    />
-                
-                ))}
-            
-        </Container>
-    );
+          />
+          <Route
+            path="/register"
+            element={ <Register/>
+            }
+          />
+          <Route
+            path="/game"
+            element={
+               room ? (
+                <Game
+                  room={room}
+                  orientation={orientation}
+                  username={username}
+                  players={players}
+                  cleanup={cleanup}
+                />
+              ) : (
+                // Redirect to login if not logged in or room not set
+                <Navigate to="/" replace />
+              )
+            }
+          />
+          {/* Optional catch-all route for handling unmatched paths */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Container>
+    </Router>
+  );
 }

@@ -1,12 +1,28 @@
 import { Button, Stack, TextField } from "@mui/material";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import CustomDialog from "./components/CustomDialog";
 import socket from './socket';
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 export default function InitGame({ setRoom, setOrientation, setPlayers }) {
+    
+    useEffect(()=>{
+         const fetch = async() =>{
+                let apiResponse = await axios.get("")
+         }
+         fetch()
+    },[])
+
+    const navigate = useNavigate()
     const [roomDialogOpen, setRoomDialogOpen] = useState(false);
     const [roomInput, setRoomInput] = useState(''); // input state
     const [roomError, setRoomError] = useState('');
+    const logout = ()=>{
+         localStorage.clear()
+         window.location.reload();
+        navigate("/")
+    }
 
     return (
         <Stack
@@ -33,6 +49,7 @@ export default function InitGame({ setRoom, setOrientation, setPlayers }) {
                     });
                 }}
             >
+           
                 <TextField
                     autoFocus
                     margin="dense"
@@ -50,6 +67,7 @@ export default function InitGame({ setRoom, setOrientation, setPlayers }) {
                 />
             </CustomDialog>
             {/* Button for starting a game */}
+            <Button onClick={logout}>Log Out</Button>
             <Button
                 variant="contained"
                 onClick={() => {
@@ -57,6 +75,7 @@ export default function InitGame({ setRoom, setOrientation, setPlayers }) {
                         console.log(r);
                         setRoom(r);
                         setOrientation("white");
+                        navigate("/game")
                     });
                 }}
             >

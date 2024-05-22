@@ -10,22 +10,23 @@ const onFinish = (values) => {
     console.log('Failed:', errorInfo);
   };
 
-const Login = () => {
-   const navigate = useNavigate()
+
+const Register = () => {
+    const navigate = useNavigate()
     const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
   const register=()=>{
-      navigate("/register")
+      navigate("/")
   }
 
   const onFinish = async() => {
     let payload = {username: username, password: password}
-    let response = await axios.post("http://localhost:8081/login", payload)
+    let response = await axios.post("http://localhost:8081/register", payload)
     console.log(response)
     if(response){
-        localStorage.setItem("setName", username)
-        window.location.reload();
+        alert("user registered successfully")
+        
         navigate("/")
     }
     console.log("Submitting form with username:", username, "and password:", password);
@@ -46,10 +47,10 @@ const Login = () => {
   };
   return (
     <>
-     <h1 style={{ position: "relative",bottom:"50px", left:"450px",fontSize:"70px" }}>Chess App</h1>
+      <h1 style={{ position: "relative",bottom:"50px", left:"450px",fontSize:"70px" }}>Chess App</h1>
     <div style={{ position: "relative", top: "100px" }}>
-      <Button onClick={register}>Register Here</Button>
-     <h1 style={{ position: "relative", left: "130px",fontSize:"40px" }}>Login</h1>
+      <Button onClick={register}>Login Here</Button>
+     <h1 style={{ position: "relative", left: "130px",fontSize:"40px" }}>Register</h1>
     <Form
       name="basic"
       labelCol={{
@@ -120,4 +121,4 @@ const Login = () => {
   )
 }
 
-export default Login
+export default Register
