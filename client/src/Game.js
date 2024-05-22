@@ -5,7 +5,7 @@ import Peer from 'simple-peer';
 import CustomDialog from "./components/CustomDialog";
 import VideoPlayer from "./components/VideoPlayer";
 import socket from "./socket";
-import { Card, CardContent, Typography, Stack, Box, List, ListItem, ListItemText, ListSubheader } from "@mui/material";
+import { Card, CardContent, Typography, Stack, Box, Grid, List, ListItem, ListItemText, ListSubheader } from "@mui/material";
 
 function Game({ players, room, orientation, cleanup }) {
     const chess = useMemo(() => new Chess(), []); // <- 1
@@ -147,42 +147,43 @@ function Game({ players, room, orientation, cleanup }) {
     }, [room, cleanup]);
 
     return (
-        <Stack>
+        <Stack spacing={2}>
             <Card>
                 <CardContent>
                     <Typography variant="h5">Room ID: {room}</Typography>
                 </CardContent>
             </Card>
-            <Stack flexDirection="row" sx={{ pt: 2 }}>
-                <div className="board" style={{
-                    maxWidth: 600,
-                    maxHeight: 600,
-                    flexGrow: 1,
-                }}>
-                    <Chessboard
-                        position={fen}
-                        onPieceDrop={onDrop}
-                        boardOrientation={orientation}
-                    />
-                </div>
-                {players.length > 0 && (
-                    <Box>
-                        <List>
-                            <ListSubheader>Players</ListSubheader>
-                            {players.map((p) => (
-                                <ListItem key={p.id}>
-                                    <ListItemText primary={p.username} />
-                                </ListItem>
-                            ))}
-                        </List>
-                    </Box>
-                )}
-                <video ref={userVideo} autoPlay playsInline />
-                {peers.map((peer, index) => (
-                    <VideoPlayer key={index} peer={peer} />
-                ))}
-            </Stack>
-            <CustomDialog // Game Over CustomDialog
+            <Box>
+                <List>
+                    <ListSubheader>Players</ListSubheader>
+                    {players.map((player, index) => (
+                        <ListItem key={index}>
+                            <ListItemText
+                                primary={player.username}
+                                secondary={player.id === socket.id ? `You: ${orientation}` : `Opponent: ${orientation === "white" ? "black" : "white"}`}
+                            />
+                        </ListItem>
+                    ))}
+                </List>
+            </Box>
+            <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                    <div className="board" style={{ maxWidth: 600, maxHeight: 600 }}>
+                        <Chessboard
+                            position={fen}
+                            onPieceDrop={onDrop}
+                            boardOrientation={orientation}
+                        />
+                    </div>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                    <video ref={userVideo} autoPlay playsInline style={{ width: "100%", maxHeight: 600 }} />
+                    {peers.map((peer, index) => (
+                        <VideoPlayer key={index} peer={peer} />
+                    ))}
+                </Grid>
+            </Grid>
+            <CustomDialog
                 open={Boolean(over)}
                 title={over}
                 contentText={over}
