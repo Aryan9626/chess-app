@@ -3,32 +3,49 @@
 version: '3.8'
 
 services:
-  client:
-    build:
-      context: ./client
-      dockerfile: Dockerfile
+  mysql-container:
+    image: mysql:5.7
+    container_name: mysql-container
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: chess_app
+      MYSQL_USER: user
+      MYSQL_PASSWORD: user
     ports:
-      - "3000:3000"
-    depends_on:
-      - server
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - chess-network
 
-  server:
+  chess-backend:
     build:
       context: ./server
       dockerfile: Dockerfile
+    container_name: chess-backend
     ports:
-      - "8080:8080"
-    # depends_on:
-    #   - db
-    # environment:
-    #   DATABASE_URL: mongodb://db:27017/mydatabase
+      - "8081:8081"
+    depends_on:
+      - mysql-container
+    networks:
+      - chess-network
 
-  # db:
-  #   image: mongo:4.2
-  #   ports:
-  #     - "27017:27017"
-  #   volumes:
-  #     - mongo-data:/data/db
+  chess-frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: chess-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - chess-backend
+    networks:
+      - chess-network
 
-# volumes:
-#   mongo-data:
+networks:
+  chess-network:
+    driver: bridge
+
+volumes:
+  mysql-data:

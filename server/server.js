@@ -139,8 +139,10 @@ class ServerApp {
             const { username, password } = req.body;
             const query = 'SELECT * FROM users WHERE username = ?';
             db.query(query, [username], async (err, result) => {
-                if (err) res.status(500).send('Database error');
-                else if (result.length > 0) {
+                if (err) {
+                    console.error('Database error during login:', err);
+                    res.status(500).send('Database error');
+                } else if (result.length > 0) {
                     const match = await bcrypt.compare(password, result[0].password);
                     if (match) {
                         res.status(200).send({ message: 'Login successful', user: result[0] });
@@ -156,14 +158,27 @@ class ServerApp {
         // User registration
         this.app.post('/register', async (req, res) => {
             const { username, password } = req.body;
-            const salt = await bcrypt.genSalt(10);
-            const hashedPassword = await bcrypt.hash(password, salt);
+            if (!username || !password) {
+                console.error('Username or password not provided');
+                return res.status(400).json({ error: 'Username and password are required' });
+            }
+            try {
+                const salt = await bcrypt.genSalt(10);
+                const hashedPassword = await bcrypt.hash(password, salt);
 
-            const query = 'INSERT INTO users (username, password) VALUES (?, ?)';
-            db.query(query, [username, hashedPassword], (err, result) => {
-                if (err) res.status(500).send('Database error');
-                else res.status(201).send({ message: 'User registered successfully', userId: result.insertId });
-            });
+                const query = 'INSERT INTO users (username, password) VALUES (?, ?)';
+                db.query(query, [username, hashedPassword], (err, result) => {
+                    if (err) {
+                        console.error('Error inserting user into the database:', err);
+                        res.status(500).json({ error: 'Database error' });
+                    } else {
+                        res.status(201).send({ message: 'User registered successfully', userId: result.insertId });
+                    }
+                });
+            } catch (error) {
+                console.error('Error during user registration:', error);
+                res.status(500).json({ error: 'Internal server error' });
+            }
         });
     }
 

@@ -1,7 +1,7 @@
 # server/Dockerfile
 
-# Use the official Node.js image as a base image
-FROM node:20-alpine
+# Use the official Node.js image based on Ubuntu
+FROM node:20
 
 # Set the working directory in the container
 WORKDIR /app
@@ -15,8 +15,12 @@ RUN npm install
 # Copy the rest of the application code
 COPY . .
 
-# Expose port 5000 to the outside world
-EXPOSE 8080
+# Copy the wait-for-it script
+COPY wait-for-it.sh ./wait-for-it.sh
+RUN chmod +x wait-for-it.sh
 
-# Command to run the application
-CMD ["npm", "start"]
+# Expose port 8081 to the outside world
+EXPOSE 8081
+
+# Command to run the application using wait-for-it
+CMD ["./wait-for-it.sh", "mysql-container:3306", "--", "node", "server.js"]
