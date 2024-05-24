@@ -33,13 +33,13 @@
 
     - name: Build Docker image for chess-backend
       docker_image:
-        name: navneet171996/chess_app_pipeline-chess-backend
+        name: aryan9626/chess_app_pipeline-chess-backend
         tag: latest
         source: pull
 
     - name: Build Docker image for chess-frontend
       docker_image:
-        name: navneet171996/chess_app_pipeline-chess-frontend
+        name: aryan9626/chess_app_pipeline-chess-frontend
         tag: latest
         source: pull
 
