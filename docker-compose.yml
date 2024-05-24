@@ -28,6 +28,13 @@ services:
       - "8081:8081"
     depends_on:
       - mysql-container
+    environment:
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - DB_HOST=mysql-container
+      - DB_PORT=3306
+      - DB_USER=user
+      - DB_PASSWORD=user
+      - DB_NAME=chess_app
     networks:
       - chess-network
 
@@ -43,9 +50,56 @@ services:
     networks:
       - chess-network
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.10.1
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - chess-network
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.10.1
+    container_name: logstash
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    ports:
+      - "5044:5044"
+    depends_on:
+      - elasticsearch
+    networks:
+      - chess-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.10.1
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - chess-network
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:7.10.1
+    volumes:
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - logstash
+    networks:
+      - chess-network
+
 networks:
   chess-network:
     driver: bridge
 
 volumes:
   mysql-data:
+  esdata:
+    driver: local

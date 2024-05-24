@@ -1,0 +1,41 @@
+```
+└── 📁chess-app
+    └── .gitignore
+    └── 📁client
+        └── .dockerignore
+        └── Dockerfile
+        └── README.md
+        └── Structure.md
+        └── package-lock.json
+        └── package.json
+        └── 📁public
+            └── favicon.ico
+            └── index.html
+            └── logo192.png
+            └── logo512.png
+            └── manifest.json
+            └── robots.txt
+        └── 📁src
+            └── App.js
+            └── Game.js
+            └── InitGame.js
+            └── 📁components
+                └── CustomDialog.js
+                └── Login.jsx
+                └── Register.jsx
+                └── VideoPlayer.js
+            └── index.js
+            └── socket.js
+    └── code.txt
+    └── docker-compose.yml
+    └── init.sql
+    └── package-lock.json
+    └── 📁server
+        └── .env
+        └── Dockerfile
+        └── logger.js
+        └── package-lock.json
+        └── package.json
+        └── server.js
+        └── wait-for-it.sh
+```
