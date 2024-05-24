@@ -23,4 +23,4 @@ RUN chmod +x wait-for-it.sh
 EXPOSE 8081
 
 # Command to run the application using wait-for-it
-CMD ["./wait-for-it.sh", "mysql-container:3306", "--timeout=30", "--", "node", "server.js"]
+CMD ["./wait-for-it.sh", "mysql-container:3306", "--timeout=60", "--", "node", "server.js"]
