@@ -1,0 +1,123 @@
+---
+- hosts: localhost
+  tasks:
+    - name: Pull Docker mysql image from Docker Hub
+      docker_image:
+        name: mysql
+        tag: 5.7
+        source: pull
+
+    - name: Pull Docker elasticsearch image from Docker Hub
+      docker_image:
+        name: docker.elastic.co/elasticsearch/elasticsearch
+        tag: 7.10.1
+        source: pull
+
+    - name: Pull Docker logstash image from Docker Hub
+      docker_image:
+        name: docker.elastic.co/logstash/logstash
+        tag: 7.10.1
+        source: pull
+
+    - name: Pull Docker kibana image from Docker Hub
+      docker_image:
+        name: docker.elastic.co/kibana/kibana
+        tag: 7.10.1
+        source: pull
+
+    - name: Pull Docker filebeat image from Docker Hub
+      docker_image:
+        name: docker.elastic.co/beats/filebeat
+        tag: 7.10.1
+        source: pull
+
+    - name: Build Docker image for chess-backend
+      docker_image:
+        name: navneet171996/chess_app_pipeline-chess-backend
+        tag: latest
+        source: pull
+
+    - name: Build Docker image for chess-frontend
+      docker_image:
+        name: navneet171996/chess_app_pipeline-chess-frontend
+        tag: latest
+        source: pull
+
+    - name: Run Docker container for mysql
+      docker_container:
+        name: mysql-container
+        image: mysql:5.7
+        ports:
+          - "3307:3306"
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: chess_app
+          MYSQL_USER: user
+          MYSQL_PASSWORD: user
+        volumes:
+          - mysql-data:/var/lib/mysql
+          - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+        state: started
+
+    - name: Run Docker container for chess-backend
+      docker_container:
+        name: chess_app_pipeline-chess-backend
+        image: chess_app_pipeline-chess-backend:latest
+        ports:
+          - "8081:8081"
+        env:
+          ELASTICSEARCH_HOST: http://elasticsearch:9200
+          DB_HOST: mysql-container
+          DB_PORT: 3306
+          DB_USER: user
+          DB_PASSWORD: user
+          DB_NAME: chess_app
+        state: started
+
+    - name: Run Docker container for chess-frontend
+      docker_container:
+        name: chess_app_pipeline-chess-frontend
+        image: chess_app_pipeline-chess-frontend:latest
+        ports:
+          - "3000:3000"
+        state: started
+
+    - name: Run Docker container for elasticsearch
+      docker_container:
+        name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:7.10.1
+        ports:
+          - "9200:9200"
+        env:
+          discovery.type: single-node
+          ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+        volumes:
+          - esdata:/usr/share/elasticsearch/data
+        state: started
+
+    - name: Run Docker container for logstash
+      docker_container:
+        name: logstash
+        image: docker.elastic.co/logstash/logstash:7.10.1
+        ports:
+          - "5044:5044"
+        volumes:
+          - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+        state: started
+
+    - name: Run Docker container for kibana
+      docker_container:
+        name: kibana
+        image: docker.elastic.co/kibana/kibana:7.10.1
+        ports:
+          - "5601:5601"
+        state: started
+
+    - name: Run Docker container for filebeat
+      docker_container:
+        name: filebeat
+        image: docker.elastic.co/beats/filebeat:7.10.1
+        volumes:
+          - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+          - /var/lib/docker/containers:/var/lib/docker/containers:ro
+        state: started
