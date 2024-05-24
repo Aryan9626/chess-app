@@ -68,7 +68,7 @@
         env:
           ELASTICSEARCH_HOST: "http://elasticsearch:9200"
           DB_HOST: "mysql-container"
-          DB_PORT: "3306"  # Notice the quotes around the port number
+          DB_PORT: "3307"  # Notice the quotes around the port number
           DB_USER: "user"
           DB_PASSWORD: "user"
           DB_NAME: "chess_app"
